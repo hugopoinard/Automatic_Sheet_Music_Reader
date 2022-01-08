@@ -12,7 +12,9 @@ import matplotlib.pyplot as plt
 import cv2 
 
 
-#filtre pour enlever la portée  
+
+"""Fonctions utilisées pour la détection des notes"""
+#filtre pour enlever la portée de la partition
 def image_value(image,x,y):
     try:
         value = image[x][y]
@@ -33,6 +35,8 @@ def filter_staff(image):
                 
     return filtered_image
 
+
+#Convertit en une image binaire en une image B&W
 def convert_binary_image(image):
     new_image = np.zeros(image.shape)
     for x in range(image.shape[0]):
@@ -43,13 +47,15 @@ def convert_binary_image(image):
                 new_image[x][y] = 0
     return new_image
 
-
+#A partir de la position de la portée (liste) et d'une coordonnée verticale x, renvoie la note associée
 def return_note(staff, x):
     dict_note = {staff[0]:"fa", int((staff[0]+staff[1])/2):"mi", staff[1]:"ré", int((staff[1]+staff[2])/2):"do", staff[2]:"si", int((staff[2]+staff[3])/2):"la",staff[3]:"sol", int((staff[3]+staff[4])/2):"fa", staff[4]:"mi"} 
     list_position = list(dict_note.keys())
     closest_note = min(list_position, key=lambda y:abs(y-x))
     return dict_note[closest_note]
     
+
+
 
 #Opening the sample sheet music image and converting it to a binary Black and White image (0 -> White, 1 -> Black)
 originalImage = cv2.imread("sheet1.png")
@@ -67,11 +73,9 @@ for i in range(image_height):
         if blackAndWhiteImage[i][j] == 0:
             image[i][j] = 1
             
-            
 
 
-
-
+"""Détection de la portée"""
 #On scanne la partition verticalement pour trouver la position de la portée. 
 histogram_vertical = np.zeros(image_height)
 
@@ -90,12 +94,14 @@ plt.plot(histogram_vertical)
 amplitude_staff = ind_staff[-1] - ind_staff[0]
 
 
-filtered_image = filter_staff(image)  
 
 
+filtered_image = filter_staff(image)
+filtered_image = convert_binary_image(filtered_image)
+cv2.imshow('Image without staff', filtered_image) 
 
+"""Détection des symboles"""
 #On scanne la partition horizontalement pour détecter les symbôles
-
 histogram_horizontal = np.zeros(image_length)
 
 for i in range(image_length):
@@ -125,9 +131,8 @@ for i in range(image_length):
             detection = False
             symbols.append([start, end])
 
-
+"""Détection et reconnaissance des notes"""
 #On extraie les notes depuis les symbôles
-
 notes = []
 notes_position = []
 threshold_largeur_note = 10
@@ -161,9 +166,7 @@ for i in range(len(notes_position)):
 
 print(recognized_notes)
 
-filtered_image = convert_binary_image(filtered_image)
 
-cv2.imshow('Image without staff', filtered_image)
 
         
 
