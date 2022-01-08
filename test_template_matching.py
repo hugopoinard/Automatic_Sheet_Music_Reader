@@ -15,12 +15,16 @@ img_rgb = cv.imread('sheet2.png')
 img_gray = cv.cvtColor(img_rgb, cv.COLOR_BGR2GRAY)
 
 
-template = cv.imread('diese sheet.png',0)
-#template = cv.resize(template, (10,31), interpolation = cv.INTER_AREA)
+template = cv.imread('bemol.jpg',0)
+cv.imshow('Diese', template)
+template = cv.resize(template, (10,31), interpolation = cv.INTER_AREA)
+
+cv.imshow('Diese', template)
+
 w, h = template.shape[::-1]
 
 res = cv.matchTemplate(img_gray,template,cv.TM_CCOEFF_NORMED)
-threshold = 0.6
+threshold = 0.5
 loc = np.where( res >= threshold)
 for pt in zip(*loc[::-1]):
     cv.rectangle(img_rgb, pt, (pt[0] + w, pt[1] + h), (0,0,255), 2)
