@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Dec  5 11:20:54 2021
-
-@author: Hugo Poinard
-"""
-
 import pandas as pd
 import numpy as np
 import matplotlib.image as mimg
@@ -12,9 +5,8 @@ import matplotlib.pyplot as plt
 import cv2 
 
 
+"""Fonctions used for notes detection"""
 
-"""Fonctions utilisées pour la détection des notes"""
-#filtre pour enlever la portée de la partition
 def image_value(image,x,y):
     try:
         value = image[x][y]
@@ -23,6 +15,7 @@ def image_value(image,x,y):
         return 0
     
 def filter_staff(image):
+    """filter to remove staff on partition"""
     height = image.shape[0]
     length = image.shape[1]
     filtered_image = np.zeros(image.shape)
@@ -35,9 +28,8 @@ def filter_staff(image):
                 
     return filtered_image
 
-
-#Convertit en une image binaire en une image B&W
 def convert_binary_image(image):
+    """convert to a binary image"""
     new_image = np.zeros(image.shape)
     for x in range(image.shape[0]):
         for y in range(image.shape[1]):
@@ -47,137 +39,154 @@ def convert_binary_image(image):
                 new_image[x][y] = 0
     return new_image
 
-#A partir de la position de la portée (liste) et d'une coordonnée verticale x, renvoie la note associée
 def return_note(staff, x):
-    dict_note = {staff[0]:"fa", int((staff[0]+staff[1])/2):"mi", staff[1]:"ré", int((staff[1]+staff[2])/2):"do", staff[2]:"si", int((staff[2]+staff[3])/2):"la",staff[3]:"sol", int((staff[3]+staff[4])/2):"fa", staff[4]:"mi"} 
+    """From the staff position and a x vertical coordinate returns the associated note"""
+    dict_note = {staff[0]:"fa", int((staff[0]+staff[1])/2):"mi", staff[1]:"re", int((staff[1]+staff[2])/2):"do", staff[2]:"si", int((staff[2]+staff[3])/2):"la",staff[3]:"sol", int((staff[3]+staff[4])/2):"fa", staff[4]:"mi"} 
     list_position = list(dict_note.keys())
     closest_note = min(list_position, key=lambda y:abs(y-x))
     return dict_note[closest_note]
-    
 
 
+class OMR():
+    def __init__(self, originalImage):
+        self.originalImage = originalImage
 
-#Opening the sample sheet music image and converting it to a binary Black and White image (0 -> White, 1 -> Black)
-originalImage = cv2.imread("sheet1.png")
-grayImage = cv2.cvtColor(originalImage, cv2.COLOR_BGR2GRAY)
-(thresh, blackAndWhiteImage) = cv2.threshold(grayImage, 127, 255, cv2.THRESH_BINARY)
-cv2.imshow('Black white image', blackAndWhiteImage)
-
-image_height = blackAndWhiteImage.shape[0]
-image_length = blackAndWhiteImage.shape[1]
-
-
-image = np.zeros([image_height, image_length])
-for i in range(image_height):
-    for j in range(image_length):
-        if blackAndWhiteImage[i][j] == 0:
-            image[i][j] = 1
-            
-
-
-"""Détection de la portée"""
-#On scanne la partition verticalement pour trouver la position de la portée. 
-histogram_vertical = np.zeros(image_height)
-
-for i in range(image_height):
-    for j in range(image_length):
-        histogram_vertical[i] += image[i][j]
-
+    def preprocessing(self):
+        # Opening the sample sheet music image and 
+        # converting it to a binary Black and White image (0 -> White, 1 -> Black)
+        grayImage = cv2.cvtColor(originalImage, cv2.COLOR_BGR2GRAY)
+        thresh, blackAndWhiteImage = cv2.threshold(grayImage, 127, 255, cv2.THRESH_BINARY)
+        while True:
+            cv2.imshow('Black white image', blackAndWhiteImage)
+            # Quit
+            k = cv2.waitKey(1) & 0xFF
+            if k == ord('q'):
+                break
         
-ind_staff = np.argpartition(histogram_vertical, -5)[-5:]
-ind_staff.sort()
+        self.image_height, self.image_length = blackAndWhiteImage.shape
 
-print(ind_staff)
-plt.figure()
-plt.plot(histogram_vertical)
+        self.image = np.zeros([self.image_height, self.image_length])
+        # invert of blackAndWhiteImage ??
+        for i in range(self.image_height):
+            for j in range(self.image_length):
+                if blackAndWhiteImage[i][j] == 0:
+                    self.image[i][j] = 1
 
-amplitude_staff = ind_staff[-1] - ind_staff[0]
+    def staff_detection(self, debug=False):
+        """Scanning partition vertically to find the staff position"""
+        histogram_vertical = np.zeros(self.image_height)
+
+        for i in range(self.image_height):
+            for j in range(self.image_length):
+                histogram_vertical[i] += self.image[i][j]
+
+                
+        self.ind_staff = np.argpartition(histogram_vertical, -5)[-5:]
+        self.ind_staff.sort()
+
+        self.filtered_image = filter_staff(self.image)
+        self.filtered_image = convert_binary_image(self.filtered_image)
+
+        if debug:
+            print(self.ind_staff)
+            plt.figure()
+            plt.plot(histogram_vertical)
+            plt.show()
+
+            while True:
+                cv2.imshow('Image without staff', self.filtered_image) 
+                # Quit
+                k = cv2.waitKey(1) & 0xFF
+                if k == ord('q'):
+                    break
+
+        amplitude_staff = self.ind_staff[-1] - self.ind_staff[0]
+
+        return amplitude_staff
+
+    def symbols_detection(self):
+        """Scanning the partition horizontally to detect the symbols"""
+        histogram_horizontal = np.zeros(self.image_length)
+
+        for i in range(self.image_length):
+            for j in range(self.image_height):
+                histogram_horizontal[i] += self.filtered_image[j][i]
+                
+        plt.figure()
+        plt.plot(histogram_horizontal)
+        plt.show()
 
 
-
-
-filtered_image = filter_staff(image)
-filtered_image = convert_binary_image(filtered_image)
-cv2.imshow('Image without staff', filtered_image) 
-
-"""Détection des symboles"""
-#On scanne la partition horizontalement pour détecter les symbôles
-histogram_horizontal = np.zeros(image_length)
-
-for i in range(image_length):
-    for j in range(image_height):
-        histogram_horizontal[i] += filtered_image[j][i]
-        
-plt.figure()
-plt.plot(histogram_horizontal)
-
-
-threshold = 5
-#On stocke la position horizontale [début - fin] des symbôles détectés
-detection = False
-symbols = []
-start = 0
-end = 0
-for i in range(image_length):
-    if histogram_horizontal[i] > threshold:
-        if detection:
-            end += 1
-        else:
-            start = i
-            end = i
-        detection = True
-    else:
-        if detection :
-            detection = False
-            symbols.append([start, end])
-
-"""Détection et reconnaissance des notes"""
-#On extraie les notes depuis les symbôles
-notes = []
-notes_position = []
-threshold_largeur_note = 10
-for symbol in symbols[4:]:
-    if symbol[1] - symbol[0] > threshold_largeur_note:
-        histogram_notes = np.zeros(image_height)
-        for i in range(image_height):
-            for j in range(symbol[0], symbol[1]):
-                histogram_notes[i] += filtered_image[i][j]
-        notes.append(histogram_notes)
+        self.threshold = 5
+        # saving the horizontal position [start - end] for detected symbols
         detection = False
         symbols = []
         start = 0
         end = 0
-        for i in range(image_height):
-            if histogram_notes[i] > threshold:
+        for i in range(self.image_length):
+            if histogram_horizontal[i] > self.threshold:
                 if detection:
                     end += 1
                 else:
                     start = i
                     end = i
-                    detection = True
+                detection = True
             else:
-                if detection :
+                if detection:
                     detection = False
-        notes_position.append((end+start)/2)    
-      
-recognized_notes = []
-for i in range(len(notes_position)):
-    recognized_notes.append(return_note(ind_staff, notes_position[i]))
+                    symbols.append([start, end])
+        
+        return symbols
 
-print(recognized_notes)
+    def notes_recognition(self, symbols):
+        """Detection and recognition of notes from symbols"""
+        notes = []
+        notes_position = []
+        threshold_largeur_note = 10
+        for symbol in symbols[4:]:
+            if symbol[1] - symbol[0] > threshold_largeur_note:
+                histogram_notes = np.zeros(self.image_height)
+                for i in range(self.image_height):
+                    for j in range(symbol[0], symbol[1]):
+                        histogram_notes[i] += self.filtered_image[i][j]
+                notes.append(histogram_notes)
+                detection = False
+                symbols = []
+                start = 0
+                end = 0
+                for i in range(self.image_height):
+                    if histogram_notes[i] > self.threshold:
+                        if detection:
+                            end += 1
+                        else:
+                            start = i
+                            end = i
+                            detection = True
+                    else:
+                        if detection :
+                            detection = False
+                notes_position.append((end+start)/2)    
+            
+        recognized_notes = []
+        for i in range(len(notes_position)):
+            recognized_notes.append(return_note(self.ind_staff, notes_position[i]))
+        
+        return recognized_notes
 
-
-
+    def main(self):
+        self.preprocessing()
+        self.staff_detection()
+        symbols = self.symbols_detection()
+        print(symbols)
+        recognized_notes = self.notes_recognition(symbols)
+        return recognized_notes
         
 
-        
-"""
-class SheetMusic:
-    def _init_(self):
-        self.clef = "
-        self.key = "G_Major"
-        self.time_signature = "4/4"
-        
-    def transpose(self, new_key):
-        self.key = new_key
-        """
+if __name__ == '__main__':
+    originalImage = cv2.imread("sheet/sheet1.png")
+    # originalImage = cv2.imread("sheet/sheet2.png")
+    # originalImage = cv2.imread("sheet/Mary-Had-a-Little-Lamb-9.png")
+
+    omr = OMR(originalImage)
+    recognized_notes = omr.main()
+    print(recognized_notes)
