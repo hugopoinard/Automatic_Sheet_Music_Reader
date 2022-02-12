@@ -51,17 +51,19 @@ class OMR():
     def __init__(self, originalImage):
         self.originalImage = originalImage
 
-    def preprocessing(self):
+    def preprocessing(self, debug=False):
         # Opening the sample sheet music image and 
         # converting it to a binary Black and White image (0 -> White, 1 -> Black)
         grayImage = cv2.cvtColor(originalImage, cv2.COLOR_BGR2GRAY)
         thresh, blackAndWhiteImage = cv2.threshold(grayImage, 127, 255, cv2.THRESH_BINARY)
-        while True:
-            cv2.imshow('Black white image', blackAndWhiteImage)
-            # Quit
-            k = cv2.waitKey(1) & 0xFF
-            if k == ord('q'):
-                break
+
+        if debug:
+            while True:
+                cv2.imshow('Black white image', blackAndWhiteImage)
+                # Quit
+                k = cv2.waitKey(1) & 0xFF
+                if k == ord('q'):
+                    break
         
         self.image_height, self.image_length = blackAndWhiteImage.shape
 
@@ -85,8 +87,7 @@ class OMR():
         self.ind_staff.sort()
 
         self.filtered_image = filter_staff(self.image)
-        self.filtered_image = convert_binary_image(self.filtered_image)
-
+        
         if debug:
             print(self.ind_staff)
             plt.figure()
@@ -94,7 +95,8 @@ class OMR():
             plt.show()
 
             while True:
-                cv2.imshow('Image without staff', self.filtered_image) 
+                filtered_image_converted = convert_binary_image(self.filtered_image)
+                cv2.imshow('Image without staff', filtered_image_converted) 
                 # Quit
                 k = cv2.waitKey(1) & 0xFF
                 if k == ord('q'):
@@ -177,7 +179,6 @@ class OMR():
         self.preprocessing()
         self.staff_detection()
         symbols = self.symbols_detection()
-        print(symbols)
         recognized_notes = self.notes_recognition(symbols)
         return recognized_notes
         
