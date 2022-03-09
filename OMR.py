@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.image as mimg
 import matplotlib.pyplot as plt
 import cv2 
-
+from statistics import mean
 
 """Fonctions used for notes detection"""
 
@@ -54,7 +54,7 @@ class OMR():
     def preprocessing(self, debug=False):
         # Opening the sample sheet music image and 
         # converting it to a binary Black and White image (0 -> White, 1 -> Black)
-        grayImage = cv2.cvtColor(originalImage, cv2.COLOR_BGR2GRAY)
+        grayImage = cv2.cvtColor(self.originalImage, cv2.COLOR_BGR2GRAY)
         thresh, blackAndWhiteImage = cv2.threshold(grayImage, 127, 255, cv2.THRESH_BINARY)
 
         if debug:
@@ -67,8 +67,8 @@ class OMR():
         
         self.image_height, self.image_length = blackAndWhiteImage.shape
 
+        # invert binaries of blackAndWhiteImage
         self.image = np.zeros([self.image_height, self.image_length])
-        # invert of blackAndWhiteImage ??
         for i in range(self.image_height):
             for j in range(self.image_length):
                 if blackAndWhiteImage[i][j] == 0:
@@ -105,6 +105,43 @@ class OMR():
         amplitude_staff = self.ind_staff[-1] - self.ind_staff[0]
 
         return amplitude_staff
+    
+    def bar_detection(self, debug=False):
+        """Scanning vertically to detect vertical bar which delimits the measures
+        Computed after staff_detection"""
+        bar_x = []
+        for x in range(self.image_length):
+            if all([self.image[j][x] == 1 for j in range(self.ind_staff[0], self.ind_staff[-1])]):
+                bar_x.append(x)
+        
+        if debug:
+            while True:
+                image_with_bars = self.originalImage
+                # add vertical bars with red lines
+                for x in bar_x:
+                    image_with_bars = cv2.line(image_with_bars, (x,self.ind_staff[0]), (x,self.ind_staff[-1]), (0, 0, 255), 1)
+                cv2.imshow('Image with vertical bars', image_with_bars)
+                # Quit
+                k = cv2.waitKey(1) & 0xFF
+                if k == ord('q'):
+                    break
+
+        # get center of bars
+        bar_center_x = []
+        i = 0
+        while i < len(bar_x):
+            bar = [bar_x[i]]
+            while i+1 < len(bar_x) and bar_x[i+1] == bar_x[i] + 1:
+                bar.append(bar_x[i+1])
+                i += 1
+            i += 1
+            center_x = mean(bar)
+            bar_center_x.append(center_x)
+        
+        if debug:
+            print(len(bar_center_x), "vertical bars detected")
+            
+        return bar_center_x
 
     def symbols_detection(self):
         """Scanning the partition horizontally to detect the symbols"""
@@ -178,6 +215,8 @@ class OMR():
     def main(self):
         self.preprocessing()
         self.staff_detection()
+        bar_x = self.bar_detection(debug=True)
+        print(bar_x)
         symbols = self.symbols_detection()
         recognized_notes = self.notes_recognition(symbols)
         return recognized_notes
